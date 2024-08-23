@@ -6,6 +6,7 @@ from streamlit_folium import folium_static
 from geopy.geocoders import Nominatim
 from geopy.distance import distance
 import math
+import random
 
 # Custom CSS to make the app more beautiful and modern
 st.markdown("""
@@ -89,6 +90,20 @@ st.markdown("""
     .stSlider>div>div>div>div {
         background-color: #ff4e50;
     }
+    .random-choices {
+        border: 1px solid white;
+        padding: 20px;
+        margin-top: 20px;
+        margin-bottom: 20px;
+        border-radius: 10px;
+        background-color: rgba(255, 255, 255, 0.9);
+    }
+    .random-choices-title {
+        font-size: 24px !important;
+        font-weight: 600;
+        color: #ff4e50;
+        margin-bottom: 15px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -142,6 +157,21 @@ def create_map(lat, lon, food_options, view_radius):
     
     return m
 
+def get_random_food_choices(lat, lon, food_options, num_choices=10, max_distance=1000):
+    nearby_options = []
+    for food_option in food_options:
+        if 'center' in food_option:
+            food_lat, food_lon = food_option['center']['lat'], food_option['center']['lon']
+        else:
+            food_lat, food_lon = food_option['lat'], food_option['lon']
+        
+        dist = distance((lat, lon), (food_lat, food_lon)).m
+        if dist <= max_distance:
+            nearby_options.append((dist, food_option))
+    
+    nearby_options.sort(key=lambda x: x[0])
+    return random.sample(nearby_options, min(num_choices, len(nearby_options)))
+
 def main():
     st.markdown('<p class="big-font">Foodie Finder SG</p>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">Helping clueless people find inspiration for food all around you!</p>', unsafe_allow_html=True)
@@ -156,6 +186,8 @@ def main():
         st.session_state.map = None
     if 'view_radius' not in st.session_state:
         st.session_state.view_radius = 1000
+    if 'random_choices' not in st.session_state:
+        st.session_state.random_choices = []
 
     location_input = st.text_input("Enter your location:", value=st.session_state.location_input, 
                                    help="Enter a city, address, or landmark")
@@ -207,6 +239,20 @@ def main():
         
         folium_static(st.session_state.map)
 
+        # New section for random food choices
+        st.markdown('<p class="random-choices-title">10 random food choices within 1km if you can\'t choose!</p>', unsafe_allow_html=True)
+        
+        if st.button("Generate!", key="generate_random"):
+            st.session_state.random_choices = get_random_food_choices(lat, lon, food_options)
+
+        # Only display the white box if there are random choices
+        if st.session_state.random_choices:
+            st.markdown('<div class="random-choices">', unsafe_allow_html=True)
+            for i, (dist, food_option) in enumerate(st.session_state.random_choices, 1):
+                name = food_option['tags'].get('name', 'Unknown')
+                st.write(f"{i}. {name} - Distance: {dist:.2f} m")
+            st.markdown('</div>', unsafe_allow_html=True)
+
     if st.session_state.food_option_distances:
         st.markdown('<p class="medium-font">List of Nearby Food Options (within 5km)</p>', unsafe_allow_html=True)
         
@@ -254,5 +300,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# test comment
